@@ -12,7 +12,7 @@
       --text: #e2e8f0;
       --user-bubble: #1e40af;
       --ai-bubble: #111827;
-      --accent: #22c55e; /* Grok green */
+      --accent: #22c55e;
       --accent-dark: #16a34a;
       --border: #1e293b;
       --header-bg: rgba(5,8,15,0.92);
@@ -84,7 +84,23 @@
       font-family: 'Consolas', monospace;
       font-size: 0.95rem;
       border: 1px solid var(--border);
+      margin: 12px 0;
+      position: relative;
     }
+    .script-copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(34,197,94,0.8);
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .script-copy-btn:hover { background: var(--accent-dark); }
     .copy-btn {
       position: absolute;
       top: 10px;
@@ -245,8 +261,11 @@
           }
         }
 
+        // Finalize message + add script-only copy buttons
         aiMsg.querySelector(".content").innerHTML = renderMarkdown(fullText);
-        addCopyButton(aiMsg, fullText);
+        addCopyButton(aiMsg, fullText);           // whole message copy
+        addScriptCopyButtons(aiMsg);              // per-code-block "Copy Script Only"
+
         messages.push({ role: "assistant", content: fullText });
 
       } catch (err) {
@@ -262,7 +281,7 @@
       div.innerHTML = `
         <div class="avatar">${role === "user" ? "You" : "G"}</div>
         <div class="bubble">
-          <div class="content ${streaming ? "typing" : ""}">${streaming ? "" : renderMarkdown(text)}</div>
+          <div class="content $$   {streaming ? "typing" : ""}">   $${streaming ? "" : renderMarkdown(text)}</div>
         </div>
       `;
       chatContainer.appendChild(div);
@@ -270,6 +289,7 @@
       return div;
     }
 
+    // Copy whole AI message
     function addCopyButton(msgDiv, text) {
       const btn = document.createElement("button");
       btn.className = "copy-btn";
@@ -281,13 +301,37 @@
       msgDiv.querySelector(".bubble").appendChild(btn);
     }
 
+    // Add "Copy Script Only" to every code block
+    function addScriptCopyButtons(msgDiv) {
+      const pres = msgDiv.querySelectorAll("pre");
+      pres.forEach(pre => {
+        const btn = document.createElement("button");
+        btn.className = "script-copy-btn";
+        btn.textContent = "Copy Script Only";
+        btn.onclick = () => {
+          const code = pre.querySelector("code")?.innerText || pre.innerText;
+          navigator.clipboard.writeText(code.trim()).then(() => {
+            btn.textContent = "Copied Script!";
+            setTimeout(() => btn.textContent = "Copy Script Only", 2000);
+          });
+        };
+        pre.style.position = "relative";
+        pre.appendChild(btn);
+      });
+    }
+
     function renderMarkdown(text) {
-      return text
+      let html = text
         .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
         .replace(/\*([^*]+)\*/g, '<em>$1</em>')
         .replace(/\n/g, '<br>');
+      html = html.replace(/^[-*+] (.+)$/gm, '<li>$1</li>');
+      if (html.includes('<li>')) {
+        html = html.replace(/(<li>[\s\S]*?)(?=(<li>|<\/ul>|$))/g, '<ul>$1</ul>');
+      }
+      return html;
     }
   </script>
 </body>
